@@ -1,11 +1,11 @@
 #ifndef TSOCK_CLI_H
 #define TSOCK_CLI_H
 
-#include <stdbool.h>
-
 #define USAGE                                                                  \
     "Usage: tsock [-p | -s] [-n <nb_messages>] [-l <message_length>] [-u] "    \
     "<port>\n"
+
+#include <stdbool.h>
 
 typedef enum {
     PUITS,
@@ -13,7 +13,7 @@ typedef enum {
     NONE,
 } Source;
 
-typedef struct {
+struct tsock_config {
     int nb_message;
     bool is_tcp;
     Source source;
@@ -21,10 +21,9 @@ typedef struct {
 
     // Human readable!
     int port;
-} Parameters;
+} ;
 
-int parse(int argc, char **argv, Parameters *params);
-
-void print_cli_info(const Parameters params);
+int cli_parse(int argc, char **argv, struct tsock_config *cfg);
+void cli_print_info(const struct tsock_config params);
 
 #endif // TSOCK_CLI_H

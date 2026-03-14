@@ -5,7 +5,7 @@
 
 #include "../include/cli.h"
 
-int parse(int argc, char **argv, Parameters *params) {
+int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
     int c;
     extern char *optarg;
     extern int optind;
@@ -13,7 +13,7 @@ int parse(int argc, char **argv, Parameters *params) {
     bool is_tcp = true;
     int largeur_message = 30;
 
-    Source source = NONE; /* 0=puits, 1=source */
+    Source source = NONE; 
     while ((c = getopt(argc, argv, "psn:l:u")) != -1) {
         switch (c) {
             case 'p':
@@ -66,16 +66,16 @@ int parse(int argc, char **argv, Parameters *params) {
         return -1;
     }
 
-    params->is_tcp = is_tcp;
-    params->source = source;
-    params->nb_message = nb_message;
-    params->port = port;
-    params->largeur_message = largeur_message;
+    cfg->is_tcp = is_tcp;
+    cfg->source = source;
+    cfg->nb_message = nb_message;
+    cfg->port = port;
+    cfg->largeur_message = largeur_message;
 
     return 0;
 }
 
-void print_cli_info(const Parameters params) {
+void cli_print_info(const struct tsock_config cfg) {
     /*
      * This becomes impossible, as params.source will always be SOURCE or PUITS.
      * therefore, in the v1 we will comment it, then we will delete it.
@@ -86,18 +86,18 @@ void print_cli_info(const Parameters params) {
      */
 
     // printing if source or puits (evident)
-    if (params.source == SOURCE)
+    if (cfg.source == SOURCE)
         printf("[tsock] on est dans la source\n");
     else
         printf("[tsock] on est dans le puits\n");
 
     // print nb_message information
-    if (params.source == SOURCE)
-        printf("[tsock] nb de tampons à envoyer : %d\n", params.nb_message);
-    else if (params.source == PUITS && params.nb_message != -1)
-        printf("[tsock] nb de tampons à recevoir : %d\n", params.nb_message);
+    if (cfg.source == SOURCE)
+        printf("[tsock] nb de tampons à envoyer : %d\n", cfg.nb_message);
+    else if (cfg.source == PUITS && cfg.nb_message != -1)
+        printf("[tsock] nb de tampons à recevoir : %d\n", cfg.nb_message);
     else
         printf("[tsock] nb de tampons à recevoir : infini\n");
 
-    printf("[tsock] port number: %d\n", params.port);
+    printf("[tsock] port number: %d\n", cfg.port);
 }
