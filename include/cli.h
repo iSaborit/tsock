@@ -1,10 +1,11 @@
 #ifndef TSOCK_CLI_H
 #define TSOCK_CLI_H
 
-// command line interface parameters
+#include <stdbool.h>
 
-// TODO: change help message
-const char message_error[] = "usage: cmd [-p|-s] [-n ##] PORT\n";
+#define USAGE                                                                  \
+    "Usage: tsock [-p | -s] [-n <nb_messages>] [-l <message_length>] [-u] "    \
+    "<port>\n"
 
 typedef enum {
     PUITS,
@@ -26,4 +27,4 @@ int parse(int argc, char **argv, Parameters *params);
 
 void print_cli_info(const Parameters params);
 
-#endif //TSOCK_CLI_H
+#endif // TSOCK_CLI_H

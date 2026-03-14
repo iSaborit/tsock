@@ -5,7 +5,6 @@
 
 #include "../include/cli.h"
 
-
 int parse(int argc, char **argv, Parameters *params) {
     int c;
     extern char *optarg;
@@ -19,7 +18,7 @@ int parse(int argc, char **argv, Parameters *params) {
         switch (c) {
             case 'p':
                 if (source == SOURCE) {
-                    printf("usage: cmd [-p|-s] [-n ##]\n");
+                    fputs(USAGE, stderr);
                     return -1;
                 }
                 source = PUITS;
@@ -27,7 +26,7 @@ int parse(int argc, char **argv, Parameters *params) {
 
             case 's':
                 if (source == PUITS) {
-                    printf("usage: cmd [-p|-s] [-n ##]\n");
+                    fputs(USAGE, stderr);
                     return -1;
                 }
                 source = SOURCE;
@@ -46,7 +45,7 @@ int parse(int argc, char **argv, Parameters *params) {
                 break;
 
             default:
-                printf(message_error);
+                fputs(USAGE, stderr);
                 break;
         }
     }
@@ -57,13 +56,13 @@ int parse(int argc, char **argv, Parameters *params) {
 
     // Checking if port number was specified
     if (optind >= argc) {
-        printf(message_error);
+        fputs(USAGE, stderr);
         return -1;
     }
 
     int port = atoi(argv[argc - 1]);
     if (port == 0) {
-        printf(message_error);
+        fputs(USAGE, stderr);
         return -1;
     }
 
@@ -81,7 +80,7 @@ void print_cli_info(const Parameters params) {
      * This becomes impossible, as params.source will always be SOURCE or PUITS.
      * therefore, in the v1 we will comment it, then we will delete it.
      *  if (params.source == NONE) {
-     *      printf(message_error);
+     *      printf(USAGE);
      *      exit(1);
      *  }
      */

@@ -19,6 +19,7 @@ données du réseau */
 #include <errno.h>
 /* pour le type bool */
 #include <stdbool.h>
+
 #include <string.h>
 
 #include "../include/cli.h"
@@ -34,7 +35,7 @@ void todo() {
 
 int main(int argc, char **argv) {
     Parameters params;
-    if (parse(argc, argv, &params) == -1){
+    if (parse(argc, argv, &params) == -1) {
         perror("parse");
         exit(1);
     }
@@ -61,12 +62,12 @@ int main(int argc, char **argv) {
 
             for (int i = 97; i < params.nb_message + 97; i++) {
                 char message[params.largeur_message + 1];
-                construire_message(message, (char) i, params.largeur_message);
+                construire_message(message, (char)i, params.largeur_message);
                 afficher_message(message, params.largeur_message);
                 int r_sendto;
-                if ((r_sendto = sendto(sock, message, strlen(message), 0, (struct sockaddr *) &addr_distant,
-                                       sizeof(addr_distant))) <
-                    30) {
+                if ((r_sendto = sendto(sock, message, strlen(message), 0,
+                                       (struct sockaddr *)&addr_distant,
+                                       sizeof(addr_distant))) < 30) {
                     perror("sendto");
                     printf("[tsock] sendto return value: %d\n", r_sendto);
                 }
@@ -84,7 +85,8 @@ int main(int argc, char **argv) {
             addr_local.sin_addr.s_addr = INADDR_ANY;
             addr_local.sin_port = htons(params.port);
 
-            if (bind(sock, (struct sockaddr *) &addr_local, sizeof(addr_local)) < 0) {
+            if (bind(sock, (struct sockaddr *)&addr_local, sizeof(addr_local)) <
+                0) {
                 perror("bind");
                 exit(1);
             }
@@ -97,9 +99,12 @@ int main(int argc, char **argv) {
             if (params.nb_message == -1)
                 params.nb_message = 100000;
             for (int i = 97; i < params.nb_message + 97; i++) {
-                char message[params.largeur_message+1];
+                char message[params.largeur_message + 1];
                 int r_recvfrom;
-                if ((r_recvfrom = recvfrom(sock, message, params.largeur_message, 0, (struct sockaddr *) &addr_sender, &addr_sender_len)) != params.largeur_message) {
+                if ((r_recvfrom = recvfrom(
+                         sock, message, params.largeur_message, 0,
+                         (struct sockaddr *)&addr_sender, &addr_sender_len)) !=
+                    params.largeur_message) {
                     perror("recvfrom");
                     printf("[tsock] recvfrom return value: %d\n", r_recvfrom);
                 }
