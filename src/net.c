@@ -8,17 +8,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../include/net.h"
-
-#include <errno.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 int net_udp_create_sock(int *fd) {
     if ((*fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         return -1;
@@ -35,7 +24,7 @@ int net_udp_sendto(int socket, const struct sockaddr *dst, socklen_t dst_t,
         return -1;
     }
 
-    if (rtn_sendto != len) {
+    if ((size_t) rtn_sendto != len) {
         errno = EIO;
         return -1;
     }

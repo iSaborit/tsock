@@ -71,8 +71,8 @@ static int run_udp_receiver(struct tsock_config cfg) {
     net_udp_bind(cfg.port, &sock);
     printf("Listening on the port %d\n", cfg.port);
 
-    struct sockaddr_in addr_sender;
-    socklen_t addr_sender_len = sizeof(addr_sender);
+    struct sockaddr_in sender;
+    socklen_t addr_sender_len = sizeof(sender);
 
     if (cfg.nb_message == -1)
         cfg.nb_message = 100000;
@@ -81,7 +81,7 @@ static int run_udp_receiver(struct tsock_config cfg) {
         char message[cfg.largeur_message + 1];
         int r_recvfrom;
         if ((r_recvfrom = net_udp_recvfrom(sock, message, cfg.largeur_message,
-                                           (struct sockaddr *)&addr_sender,
+                                           (struct sockaddr *)&sender,
                                            &addr_sender_len)) !=
             cfg.largeur_message) {
             perror("recvfrom");
