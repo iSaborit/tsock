@@ -14,6 +14,7 @@ int net_build_addr(const char *host, struct sockaddr_in *addr, int port) {
     addr->sin_family = AF_INET;
     addr->sin_port = htons(port);
 
+    /* Resolve the host name to an IPv4 address before connecting/sending. */
     struct hostent *h = gethostbyname(host);
     if (h == NULL) {
         return -1;
@@ -34,13 +35,14 @@ int net_udp_create_sock(int *fd) {
 
 int net_udp_sendto(int socket, const struct sockaddr *dst, socklen_t dst_t,
                    const void *buf, size_t len) {
-    int rtn_sendto;
-    rtn_sendto = sendto(socket, buf, len, 0, dst, dst_t);
-    if (rtn_sendto < 0) {
+    int sendto_result;
+    sendto_result = sendto(socket, buf, len, 0, dst, dst_t);
+    if (sendto_result < 0) {
         return -1;
     }
 
-    if ((size_t)rtn_sendto != len) {
+    /* Treat a partial UDP send as an error. */
+    if ((size_t)sendto_result != len) {
         errno = EIO;
         return -1;
     }
@@ -49,26 +51,26 @@ int net_udp_sendto(int socket, const struct sockaddr *dst, socklen_t dst_t,
 }
 
 int net_udp_bind(const int port, int *socket_fd) {
-    struct sockaddr_in addr_local;
-    memset(&addr_local, 0, sizeof(addr_local));
+    struct sockaddr_in local_addr;
+    memset(&local_addr, 0, sizeof(local_addr));
 
-    // build client socket address
-    addr_local.sin_family = AF_INET;
-    addr_local.sin_addr.s_addr = INADDR_ANY;
-    addr_local.sin_port = htons(port);
+    /* Bind the socket on all local interfaces for the requested port. */
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_addr.s_addr = INADDR_ANY;
+    local_addr.sin_port = htons(port);
 
-    return bind(*socket_fd, (struct sockaddr *)&addr_local, sizeof(addr_local));
+    return bind(*socket_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
 }
 
 int net_udp_recvfrom(int socket, void *buf, size_t len, struct sockaddr *dst,
-                     socklen_t *dst_t) {
-    int rtn_recvfrom;
-    rtn_recvfrom = recvfrom(socket, buf, len, 0, dst, dst_t);
-    if (rtn_recvfrom < 0) {
+                     socklen_t *dst_len) {
+    int recvfrom_result;
+    recvfrom_result = recvfrom(socket, buf, len, 0, dst, dst_len);
+    if (recvfrom_result < 0) {
         return -1;
     }
 
-    return rtn_recvfrom;
+    return recvfrom_result;
 }
 
 int net_tcp_create_sock(int *fd) {
@@ -80,14 +82,14 @@ int net_tcp_create_sock(int *fd) {
 }
 
 int net_tcp_bind(const int port, const int *socket_fd) {
-    struct sockaddr_in addr_local = {0};
+    struct sockaddr_in local_addr = {0};
 
-    // build client socket address
-    addr_local.sin_family = AF_INET;
-    addr_local.sin_addr.s_addr = INADDR_ANY;
-    addr_local.sin_port = htons(port);
+    /* Bind the socket on all local interfaces for the requested port. */
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_addr.s_addr = INADDR_ANY;
+    local_addr.sin_port = htons(port);
 
-    return bind(*socket_fd, (struct sockaddr *)&addr_local, sizeof(addr_local));
+    return bind(*socket_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
 }
 
 int net_tcp_connect(const int socket_fd, const struct sockaddr_in *addr) {
@@ -98,25 +100,29 @@ int net_tcp_connect(const int socket_fd, const struct sockaddr_in *addr) {
     return 0;
 }
 
-/// Listens.
 int net_tcp_listen(int socket_fd, int max_number) {
     return listen(socket_fd, max_number);
 }
 
 int net_tcp_accept(int socket_fd, struct sockaddr *client,
-                   socklen_t *client_len, int *socket_fd_bis) {
+                   socklen_t *client_len, int *client_socket_fd) {
+
+    /* `accept` expects the input/output size of the client address buffer. */
     *client_len = sizeof(*client);
-    if ((*socket_fd_bis = accept(socket_fd, client, client_len)) == -1) {
+    if ((*client_socket_fd = accept(socket_fd, client, client_len)) == -1) {
         return -1;
     }
 
     return 0;
 }
 
-int net_tcp_read(const int socket_fd_bis, char *message,
+/* A single `read` may return fewer bytes than requested: the caller handles the
+ * actual size received. */
+int net_tcp_read(const int client_socket_fd, char *message,
                  const int message_length) {
     int bytes_received;
-    if ((bytes_received = read(socket_fd_bis, message, message_length)) == -1) {
+    if ((bytes_received = read(client_socket_fd, message, message_length)) ==
+        -1) {
         perror("read");
         return -1;
     }
@@ -124,10 +130,10 @@ int net_tcp_read(const int socket_fd_bis, char *message,
     return bytes_received;
 }
 
-int net_tcp_write(const int socket_fd_bis, const char *message,
+int net_tcp_write(const int client_socket_fd, const char *message,
                   const int message_length) {
     int bytes_sent;
-    if ((bytes_sent = write(socket_fd_bis, message, message_length)) == -1) {
+    if ((bytes_sent = write(client_socket_fd, message, message_length)) == -1) {
         perror("write");
         return -1;
     }

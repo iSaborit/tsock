@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Wpedantic -Iinclude
+CFLAGS := -Wall -Wextra -Wpedantic -Wundef -Wstrict-prototypes -Wimplicit-fallthrough -Iinclude
 BUILD_DIR := build
 BIN_DIR := bin
 TARGET := $(BIN_DIR)/tsock
@@ -23,4 +23,4 @@ run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	/usr/bin/rm -rf -- $(BUILD_DIR) $(TARGET)
+	rm -rf -- $(BUILD_DIR) $(TARGET)

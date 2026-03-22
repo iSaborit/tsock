@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,10 +12,9 @@ int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
     int c;
     extern char *optarg;
     extern int optind;
-    int nb_message = -1; /* Nb de messages à envoyer ou à recevoir, par défaut :
-                            10 en émission, infini en réception */
+    int message_count = -1;
     bool is_tcp = true;
-    int largeur_message = 30;
+    int message_width = 30;
 
     Mode source = NONE;
     while ((c = getopt(argc, argv, "psn:l:u")) != -1) {
@@ -36,11 +36,16 @@ int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
             break;
 
         case 'n':
-            nb_message = atoi(optarg);
+            message_count = atoi(optarg);
+            if (message_count <= 0) {
+                fputs("USAGE\n", stderr);
+                fputs("Consider a positive number of messages.", stderr);
+                return -1;
+            }
             break;
 
         case 'l':
-            largeur_message = atoi(optarg);
+            message_width = atoi(optarg);
             break;
 
         case 'u':
@@ -52,47 +57,73 @@ int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
             return -1;
         }
     }
+
+    /* If neither `-p` nor `-s` is given, defaults to SOURCE. */
     if (source == NONE)
         source = SOURCE;
 
-    if (nb_message == -1 && source == SOURCE)
-        nb_message = 10;
+    /* A source sends 10 messages when `-n` is ommited. */
+    if (message_count == -1 && source == SOURCE)
+        message_count = 10;
 
     int remaining_args = argc - optind;
 
+    /**
+     * Positional arguments depend on the mode:
+     * - SOURCE: `[dest] port`
+     * - PUITS: `port`
+     */
     if (remaining_args == 2 && source == PUITS) {
-        printf("this is the problemna");
         fputs(USAGE, stderr);
         return -1;
     }
 
     if (remaining_args == 2 && source == SOURCE) {
         char *dest = argv[optind];
-        cfg->dest = malloc(strlen(dest) + 20);
+        cfg->dest = strdup(dest);
         if (cfg->dest == NULL) {
             perror("malloc");
             return -1;
         }
-        sprintf(cfg->dest, "%s.insa-toulouse.fr", dest);
         optind++;
     } else if (remaining_args == 1) {
         cfg->dest = strdup("127.0.0.1");
+        if (cfg->dest == NULL) {
+            perror("malloc");
+            return -1;
+        }
     } else {
         fputs(USAGE, stderr);
         return -1;
     }
 
-    int port = atoi(argv[optind]);
-    if (port == 0) {
+    /* Parse and validate the port strictly to reject non numeric or out of
+     * range values */
+    char *endptr = NULL;
+    errno = 0;
+    long port_long = strtol(argv[optind], &endptr, 10);
+    if (errno != 0 || endptr == argv[optind] || *endptr != '\0' ||
+        port_long < 1 || port_long > 65535) {
+        free(cfg->dest);
         fputs(USAGE, stderr);
+        return -1;
+    }
+    int port = (int)port_long;
+
+    /* Mesages must be at least 5 bytes long because the prefix stores the
+     * message number on 5 characters. */
+    if (message_width < 5) {
+        free(cfg->dest);
+        fputs(USAGE, stderr);
+        fputs("Please consider a message length greater than 4", stderr);
         return -1;
     }
 
     cfg->is_tcp = is_tcp;
     cfg->mode = source;
-    cfg->nb_message = nb_message;
+    cfg->message_count = message_count;
     cfg->port = port;
-    cfg->message_length = largeur_message;
+    cfg->message_length = message_width;
 
     return 0;
 }
@@ -113,11 +144,11 @@ void cli_print_info(const struct tsock_config cfg) {
 
     if (cfg.mode == SOURCE) {
         printf("Destination: %s, ", cfg.dest);
-        printf("Number of messages to send: %d, ", cfg.nb_message);
-    } else if (cfg.mode == PUITS && cfg.nb_message != -1)
-        printf("Number of messages to receive: %d, ", cfg.nb_message);
+        printf("Number of messages to send: %d, ", cfg.message_count);
+    } else if (cfg.mode == PUITS && cfg.message_count != -1)
+        printf("Number of messages to receive: %d, ", cfg.message_count);
     else
-        printf("Number of messages to receive: infinite.");
+        printf("Number of messages to receive: infinite. ");
 
     printf("Message length: %d.\n", cfg.message_length);
 }
