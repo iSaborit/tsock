@@ -5,6 +5,8 @@
 
 #include "../include/cli.h"
 
+#include <string.h>
+
 int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
     int c;
     extern char *optarg;
@@ -12,8 +14,9 @@ int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
     int nb_message = -1; /* Nb de messages à envoyer ou à recevoir, par défaut : 10 en émission, infini en réception */
     bool is_tcp = true;
     int largeur_message = 30;
+    char *message = NULL;
 
-    Source source = NONE; 
+    Mode source = NONE;
     while ((c = getopt(argc, argv, "psn:l:u")) != -1) {
         switch (c) {
             case 'p':
@@ -54,50 +57,60 @@ int cli_parse(int argc, char **argv, struct tsock_config *cfg) {
     if (nb_message == -1 && source == SOURCE)
         nb_message = 10;
 
-    // Checking if port number was specified
-    if (optind >= argc) {
+    int remaining_args = argc - optind;
+
+    if (remaining_args == 2 && source == SOURCE) {
+        char *dest = argv[optind];
+        cfg->dest = malloc(strlen(dest) + 20);
+        if (cfg->dest == NULL) {
+            perror("malloc");
+            return -1;
+        }
+        sprintf(cfg->dest, "%s@insa-toulouse.fr", dest);
+        optind++;
+    } else if (remaining_args == 1) {
+        cfg->dest = strdup("127.0.0.1");
+    } else {
         fputs(USAGE, stderr);
         return -1;
     }
 
-    int port = atoi(argv[argc - 1]);
+    int port = atoi(argv[optind]);
     if (port == 0) {
         fputs(USAGE, stderr);
         return -1;
     }
 
     cfg->is_tcp = is_tcp;
-    cfg->source = source;
+    cfg->mode = source;
     cfg->nb_message = nb_message;
     cfg->port = port;
-    cfg->largeur_message = largeur_message;
+    cfg->message_length = largeur_message;
 
     return 0;
 }
 
 void cli_print_info(const struct tsock_config cfg) {
-    /*
-     * This becomes impossible, as params.source will always be SOURCE or PUITS.
-     * therefore, in the v1 we will comment it, then we will delete it.
-     *  if (params.source == NONE) {
-     *      printf(USAGE);
-     *      exit(1);
-     *  }
-     */
 
-    // printing if source or puits (evident)
-    if (cfg.source == SOURCE)
-        printf("[tsock] on est dans la source\n");
+    if (cfg.mode == SOURCE)
+        printf("[SOURCE]: ");
     else
-        printf("[tsock] on est dans le puits\n");
+        printf("[PUITS]: ");
 
-    // print nb_message information
-    if (cfg.source == SOURCE)
-        printf("[tsock] nb de tampons à envoyer : %d\n", cfg.nb_message);
-    else if (cfg.source == PUITS && cfg.nb_message != -1)
-        printf("[tsock] nb de tampons à recevoir : %d\n", cfg.nb_message);
+    if (cfg.is_tcp)
+        printf("Transport protocol: TCP, ");
     else
-        printf("[tsock] nb de tampons à recevoir : infini\n");
+        printf("Transport protocol: UDP, ");
 
-    printf("[tsock] port number: %d\n", cfg.port);
+    printf("Port number: %d, ", cfg.port);
+
+    if (cfg.mode == SOURCE)
+        printf("Destination: %s, ", cfg.dest);
+        printf("Number of messages to send: %d, ", cfg.nb_message);
+    else if (cfg.mode == PUITS && cfg.nb_message != -1)
+        printf("Number of messages to receive: %d, ", cfg.nb_message);
+    else
+        printf("Number of messages to receive: infinite, ");
+
+    printf("Message length: %d.\n", cfg.message_length);
 }

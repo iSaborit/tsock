@@ -30,8 +30,10 @@ données du réseau */
 int main(int argc, char **argv) {
     struct tsock_config cfg;
     cli_parse(argc, argv, &cfg);
+    cli_print_info(cfg);
     app_run(cfg);
+
+    free(cfg.dest);
 
     return 0;
 }
-
