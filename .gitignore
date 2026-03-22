@@ -29,3 +29,5 @@ tsock
 
 # Local archives
 *.zip
+
+.cache/
