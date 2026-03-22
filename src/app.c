@@ -2,11 +2,11 @@
 #include "../include/net.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <limits.h>
 #include <string.h>
+#include <unistd.h>
 
 /*
 static int todo(void) {
@@ -21,8 +21,10 @@ static int run_udp_receiver(struct tsock_config cfg);
 static int run_tcp_sender(const struct tsock_config cfg);
 static int run_tcp_receiver(struct tsock_config cfg);
 
-static void build_message(char *message, const char motif, const int lg, const int message_number);
-static void print_message(const char *message, const int lg, const int message_number, const Mode mode);
+static void build_message(char *message, const char motif, const int lg,
+                          const int message_number);
+static void print_message(const char *message, const int lg,
+                          const int message_number, const Mode mode);
 
 int app_run(const struct tsock_config cfg) {
     if (cfg.is_tcp) {
@@ -49,7 +51,7 @@ static int run_udp_sender(struct tsock_config cfg) {
 
     // build destination socket address
     struct sockaddr_in destination;
-    net_build_addr("127.0.0.1", &destination, cfg.port);
+    net_build_addr(cfg.dest, &destination, cfg.port);
 
     for (int i = 0; i < cfg.nb_message; i++) {
         char message[cfg.message_length + 1];
@@ -57,8 +59,7 @@ static int run_udp_sender(struct tsock_config cfg) {
         print_message(message, cfg.message_length, i, cfg.mode);
 
         if (net_udp_sendto(sock, (struct sockaddr *)&destination,
-                           sizeof(destination), message,
-                           cfg.message_length)) {
+                           sizeof(destination), message, cfg.message_length)) {
             fprintf(stderr, "Problem: %d", errno);
         }
     }
@@ -87,14 +88,15 @@ static int run_udp_receiver(struct tsock_config cfg) {
     socklen_t addr_sender_len = sizeof(sender);
 
     if (cfg.nb_message == -1)
-        cfg.nb_message = INT_MAX-97;
+        cfg.nb_message = INT_MAX - 97;
 
     for (int i = 97; i < cfg.nb_message + 97; i++) {
         char message[cfg.message_length + 1];
         memset(message, '\0', cfg.message_length);
 
         int r_recvfrom;
-        if ((r_recvfrom = net_udp_recvfrom(sock, message, cfg.message_length, (struct sockaddr *)&sender,
+        if ((r_recvfrom = net_udp_recvfrom(sock, message, cfg.message_length,
+                                           (struct sockaddr *)&sender,
                                            &addr_sender_len)) < 0) {
             perror("recvfrom");
             printf("[tsock] recvfrom return value: %d\n", r_recvfrom);
@@ -108,33 +110,38 @@ static int run_udp_receiver(struct tsock_config cfg) {
 
 static int run_tcp_sender(const struct tsock_config cfg) {
     int sock;
-    const char *ip = "127.0.0.1";
 
-    if (net_tcp_create_sock(&sock)) {
-        perror("socket");
-        return -1;
-    }
+    int connected = -1;
+    while (connected == -1) {
+        if (net_tcp_create_sock(&sock)) {
+            perror("socket");
+            return -1;
+        }
 
-    struct sockaddr_in destination;
-    net_build_addr(ip, &destination, cfg.port);
+        struct sockaddr_in destination;
+        net_build_addr(cfg.dest, &destination, cfg.port);
 
-    while (net_tcp_connect(sock, ip, cfg.port) == -1) {
-        perror("connect");
+        if ((connected = net_tcp_connect(sock, &destination)) == -1) {
+            perror("connect");
+            close(sock);
+            sleep(1);
+        }
     }
 
     for (int i = 0; i < cfg.nb_message; i++) {
         char message[cfg.message_length + 1];
         build_message(message, (char)(i % 26 + 97), cfg.message_length, i + 1);
-        print_message(message, cfg.message_length, i, cfg.mode);
+        print_message(message, cfg.message_length, i + 1, cfg.mode);
 
         int bytes_sent;
-        if ((bytes_sent = net_tcp_write(sock, message, cfg.message_length)) != cfg.message_length) {
+        if ((bytes_sent = net_tcp_write(sock, message, cfg.message_length)) !=
+            cfg.message_length) {
             perror("write");
             printf("[tsock] write return value: %d\n", bytes_sent);
         }
     }
 
-    printf("[SOURCE] End of emission.");
+    printf("[SOURCE] End of emission.\n");
 
     close(sock);
 
@@ -142,9 +149,7 @@ static int run_tcp_sender(const struct tsock_config cfg) {
 }
 
 static int run_tcp_receiver(struct tsock_config cfg) {
-    int sock, sock_bis;
-    struct sockaddr client;
-    socklen_t client_len;
+    int sock;
 
     if (net_tcp_create_sock(&sock)) {
         perror("socket");
@@ -161,36 +166,49 @@ static int run_tcp_receiver(struct tsock_config cfg) {
 
     printf("Listening on the port %d\n", cfg.port);
 
-    while (net_tcp_accept(sock, &client, &client_len, &sock_bis) == -1) {
-    }
+    int total_received = 0;
+    const int max_messages = cfg.nb_message;
+    while (total_received < max_messages) {
+        int sock_bis;
+        struct sockaddr client;
+        socklen_t client_len = sizeof(client);
 
-    if (cfg.nb_message == -1)
-        cfg.nb_message = INT_MAX;
-
-    for (int i = 0; i < cfg.nb_message; i++) {
-        char message[cfg.message_length + 1];
-        memset(message, '\0', cfg.message_length);
-
-        int bytes_received = net_tcp_read(sock_bis,message,cfg.message_length);
-
-        if (bytes_received == 0) {
-            printf("[PUITS] Connection ended by the sender.\n");
-            break;
+        if (net_tcp_accept(sock, &client, &client_len, &sock_bis) == -1) {
+            perror("accept");
+            continue;
         }
 
-        if (bytes_received < 0) {
-            perror("read");
-            printf("[tsock] read return value: %d\n", bytes_received);
-        }
+        if (cfg.nb_message == -1)
+            cfg.nb_message = INT_MAX;
 
-        print_message(message, cfg.message_length, i, cfg.mode);
+        while (total_received < max_messages) {
+            char message[cfg.message_length + 1];
+            memset(message, '\0', cfg.message_length);
+
+            int bytes_received =
+                net_tcp_read(sock_bis, message, cfg.message_length);
+
+            if (bytes_received == 0) {
+                printf("[PUITS] Connection ended by the sender.\n");
+                break;
+            }
+
+            if (bytes_received < 0) {
+                perror("read");
+                printf("[tsock] read return value: %d\n", bytes_received);
+            }
+            print_message(message, bytes_received, ++total_received,
+                          cfg.mode);
+        }
+        close(sock_bis);
     }
-    close(sock_bis);
+
     close(sock);
     return 0;
 }
 
-static void build_message(char *message, const char motif, const int lg, const int message_number) {
+static void build_message(char *message, const char motif, const int lg,
+                          const int message_number) {
     snprintf(message, 6, "%5d", message_number);
 
     for (int i = 5; i < lg; i++) {
@@ -200,11 +218,12 @@ static void build_message(char *message, const char motif, const int lg, const i
     message[lg] = '\0';
 }
 
-static void print_message(const char *message, const int lg, const int message_number, const Mode mode) {
+static void print_message(const char *message, const int lg,
+                          const int message_number, const Mode mode) {
     if (mode == SOURCE) {
-        printf("[SOURCE] Message #%d: (%d bytes) <", message_number+1, lg);
+        printf("[SOURCE] Message #%d: (%d bytes) <", message_number, lg);
     } else {
-        printf("[PUITS] Message #%d: (%d bytes) <", message_number+1, lg);
+        printf("[PUITS] Message #%d: (%d bytes) <", message_number, lg);
     }
 
     for (int i = 0; i < lg; i++)

@@ -28,8 +28,10 @@ données du réseau */
 
 
 int main(int argc, char **argv) {
-    struct tsock_config cfg;
-    cli_parse(argc, argv, &cfg);
+    struct tsock_config cfg = {0};
+    if (cli_parse(argc, argv, &cfg)) {
+        return -1;
+    }
     cli_print_info(cfg);
     app_run(cfg);
 
@@ -37,3 +39,4 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
