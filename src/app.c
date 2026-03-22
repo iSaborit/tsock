@@ -28,10 +28,14 @@ static void print_message(const char *message, const int lg,
 
 int app_run(const struct tsock_config cfg) {
     if (cfg.is_tcp) {
-        if (cfg.mode == SOURCE)
-            run_tcp_sender(cfg);
-        else
+        if (cfg.mode == SOURCE) {
+            if (run_tcp_sender(cfg)) {
+                fputs("tcp sender", stderr);
+                exit(1);
+            }
+        } else {
             run_tcp_receiver(cfg);
+        }
     } else {
         if (cfg.mode == SOURCE) {
             run_udp_sender(cfg);
@@ -119,7 +123,10 @@ static int run_tcp_sender(const struct tsock_config cfg) {
         }
 
         struct sockaddr_in destination;
-        net_build_addr(cfg.dest, &destination, cfg.port);
+        if (net_build_addr(cfg.dest, &destination, cfg.port)) {
+            fprintf(stderr, "invalid host: %s", cfg.dest);
+            return -1;
+        }
 
         if ((connected = net_tcp_connect(sock, &destination)) == -1) {
             perror("connect");
@@ -197,8 +204,7 @@ static int run_tcp_receiver(struct tsock_config cfg) {
                 perror("read");
                 printf("[tsock] read return value: %d\n", bytes_received);
             }
-            print_message(message, bytes_received, ++total_received,
-                          cfg.mode);
+            print_message(message, bytes_received, ++total_received, cfg.mode);
         }
         close(sock_bis);
     }

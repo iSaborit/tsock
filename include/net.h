@@ -1,8 +1,6 @@
 #ifndef TSOCK_NET_H
 #define TSOCK_NET_H
 
-#include "cli.h"
-
 #include <netinet/in.h>
 #include <stddef.h>
 #include <sys/socket.h>
